@@ -1,0 +1,64 @@
+/* Position travels one validated cell per shared STEP_MS; only the face bounces. */
+.token.in-motion {
+  transition:
+    left var(--step-ms) linear,
+    top var(--step-ms) linear;
+  z-index: 12;
+}
+.token .token-face {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+}
+.token.in-motion .token-face {
+  animation: token-hop var(--step-ms) cubic-bezier(0.3, 0, 0.4, 1) both;
+}
+.token.landed::before {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  border: 2px solid var(--token-color);
+  border-radius: 50%;
+  animation: token-land var(--land-ms) ease-out both;
+  pointer-events: none;
+}
+.token.selected {
+  outline: 3px solid #fff0b8;
+  outline-offset: 5px;
+  z-index: 9;
+}
+@keyframes token-hop {
+  0% {
+    transform: translateY(0) scale(1);
+  }
+  45% {
+    transform: translateY(-9px) scale(1.08);
+  }
+  82% {
+    transform: translateY(0) scale(1.1, 0.9);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes token-land {
+  from {
+    opacity: 0.8;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.8);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .token.in-motion {
+    transition: none;
+  }
+  .token .token-face,
+  .token.landed::before {
+    animation: none;
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "name": "ludo-unlimited",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.14"
+  },
+  "workspaces": [
+    "frontend",
+    "backend",
+    "shared"
+  ],
+  "scripts": {
+    "dev": "concurrently -k -n api,web \"npm run dev -w backend\" \"npm run dev -w frontend\"",
+    "build": "npm run build -w frontend",
+    "start": "npm run start -w backend",
+    "test": "node --test shared/test/*.test.js backend/test/*.test.js frontend/test/*.test.js",
+    "test:browser": "npm run build && node scripts/browser-tests.js",
+    "test:browser:install": "node scripts/browser-tests.js install",
+    "test:db": "node scripts/database-tests.js",
+    "format": "prettier --write frontend/src backend shared database scripts tests *.json *.js *.yml *.md",
+    "db:migrate": "node --env-file-if-exists=.env database/migrate.js"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.1",
+    "concurrently": "^9.2.1",
+    "embedded-postgres": "^17.6.0-beta.15",
+    "prettier": "^3.10.1"
+  }
+}

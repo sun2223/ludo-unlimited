@@ -1,0 +1,1 @@
+{"name":"@ludo/frontend","private":true,"type":"module","scripts":{"dev":"vite --host 0.0.0.0","build":"vite build"},"dependencies":{"react":"^19.1.1","react-dom":"^19.1.1","socket.io-client":"^4.8.1","@ludo/shared":"1.0.0"},"devDependencies":{"vite":"^6.4.1"}}
