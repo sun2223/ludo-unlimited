@@ -12,6 +12,8 @@ The original rules, game/room/chat events, token animation and deployment entry 
 
 Desktop/mobile social-game screenshots were inspected. The local social fixture uses deterministic dice and shorter reaction cooldowns; production defaults remain in shared/social.js. Voice notes have architecture only: no recording, uploads, microphone requests or continuous voice chat.
 
-A dedicated live Render smoke test is provided in playwright.live.config.js. Production verification is reported separately in the release handoff after publishing; the local results above do not establish that a deployment occurred.
+A dedicated live Render smoke test in playwright.live.config.js passed against https://ludo-unlimited.onrender.com/ after deploying commit 6e6eed7. Two isolated desktop/mobile browser sessions created and joined a private room, received the same reaction ID/text and scheduled sound, exchanged chat both ways, rolled and moved a token to matching positions, and refreshed/rejoined with saved chat and no stale banter replay. No browser page errors or mobile horizontal overflow were observed. Desktop/mobile production screenshots were inspected.
+
+The first CI run for 6e6eed7 passed unit, database and build checks, but exposed an asynchronous wait race in the capture-audio browser test. Its idle assertion could pass before the socket move arrived; the test now waits for the moved token before waiting for idle and counting completed step sounds. This is a test-only correction.
 
 Sound scheduling was checked in real Chromium and mock AudioContexts; physical-speaker sound quality was not manually auditioned. No Safari/Firefox, geographic-device network, production-load or Docker-build test was performed. A complete match remains covered by engine simulation; browser win/capture fixtures seed boundary positions.

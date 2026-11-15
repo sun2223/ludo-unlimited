@@ -177,8 +177,10 @@ test('presentation: capture and win sounds, live celebration, saved audio contro
     await expect(a.getByTestId('legal-token').first()).toBeEnabled();
     await a.evaluate(() => (window.audioNotes = []));
     await a.getByRole('button', { name: 'Move token 1', exact: true }).click();
-    await expect(a.locator('.room-main')).toHaveAttribute('data-phase', 'idle');
+    // The click can return before the socket snapshot arrives. Wait for movement
+    // before checking idle, so sound assertions run after the final landing.
     await expect(a.locator('.token').first()).toHaveAttribute('data-progress', '14');
+    await expect(a.locator('.room-main')).toHaveAttribute('data-phase', 'idle');
     expect((await a.evaluate(() => window.audioNotes)).filter((f) => f === 640)).toHaveLength(2);
     expect(await a.evaluate(() => window.audioNotes)).toContain(740);
     await expect(b.locator('.token').nth(4)).toHaveAttribute('data-progress', '-1');
