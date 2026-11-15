@@ -6,11 +6,18 @@ import { useGamePresentation } from '../animation/useGamePresentation.js';
 import { soundManager } from '../audio/SoundManager.js';
 import { RollingDie } from './RollingDie.jsx';
 import { WinCelebration } from './WinCelebration.jsx';
+import { useSocial } from '../social/useSocial.js';
+import { EmojiReactions } from '../social/EmojiReactions.jsx';
+import { BadlaBoard } from '../social/BadlaBoard.jsx';
+import { Soundboard } from '../social/Soundboard.jsx';
+import { BanterNotices } from '../social/BanterNotices.jsx';
+import '../social/social.css';
 import { Chat } from '../chat/Chat.jsx';
 export function GameRoom({ api }) {
   const { room, session, connected, busy, run } = api,
     me = session?.playerId;
   const presentation = useGamePresentation(room, connected, (cue) => soundManager.play(cue));
+  const social = useSocial(room, connected);
   const game = presentation.game;
   const locked = presentation.locked;
   const [selected, setSelected] = useState(null);
@@ -48,6 +55,7 @@ export function GameRoom({ api }) {
   }
   return (
     <main className="room-main" data-phase={presentation.phase} aria-busy={locked}>
+      <EmojiReactions events={social.events} />
       <div className="room-intro">
         <div>
           <p className="eyebrow">
@@ -80,129 +88,140 @@ export function GameRoom({ api }) {
           </button>
         </div>
       </div>
+      <BanterNotices events={social.events} players={room.players} />
       <WinCelebration
         winner={winner}
         completedId={presentation.completedId}
         matchNumber={room.matchNumber}
       />
       <div className="game-layout">
-        <section className="table-panel">
-          <div className="table-toolbar">
-            <span>
-              <i className="live-dot" />
-              {finished ? 'A ROUND TO REMEMBER' : game ? 'GAME IN PROGRESS' : 'THE GATHERING PLACE'}
-            </span>
-            <span className="table-badge">
-              <Icon name="lock" size={12} /> FRIENDS ONLY
-            </span>
-          </div>
-          <div className="board-area">
-            <Board
-              players={room.players}
-              game={game}
-              motion={
-                presentation.moving ? { ...presentation.moving, phase: presentation.phase } : null
-              }
-              selected={busy ? selected : null}
-              legal={moves}
-              onMove={(index) => play('move', { tokenIndex: index })}
-              disabled={busy || locked || !connected}
-            />
-          </div>
-          <div className="turn-controls">
-            <RollingDie
-              value={game?.dice ?? game?.lastRoll ?? 6}
-              rolling={presentation.phase === 'rolling'}
-            />
-            <div className="turn-copy">
-              {game && !finished && (
-                <span
-                  className="turn-marker"
-                  style={{ '--active-color': `var(--${current?.color})` }}
-                >
-                  <i />
-                  {mine ? 'Your turn' : `${current?.name}’s turn`}
-                </span>
-              )}
-              <strong>
-                {locked
-                  ? presentation.phase === 'rolling'
-                    ? 'Rolling the dice…'
-                    : `Moving token · ${presentation.moving?.step ?? ''}/${presentation.moving?.total ?? ''}`
-                  : finished
-                    ? `${winner?.name} takes the crown!`
-                    : !game
-                      ? 'A good game starts with good company.'
-                      : !current?.connected
-                        ? `${current?.name} is reconnecting…`
-                        : mine
-                          ? game.phase === 'move'
-                            ? 'Your move. Make it count.'
-                            : 'Your turn. Feeling lucky?'
-                          : `${current?.name}’s turn`}
-              </strong>
-              <p aria-live="polite">
-                {game?.lastAction ?? 'Share your room code and get everyone around the table.'}
-              </p>
-            </div>
-            {game && !finished && (
-              <button
-                className="primary roll-button"
-                onClick={() => play('roll')}
-                disabled={!mine || game.phase !== 'roll' || busy || locked || !connected}
-              >
-                {busy
-                  ? 'One moment…'
-                  : mine
-                    ? game.phase === 'move'
-                      ? 'Choose a token'
-                      : 'Roll the dice'
-                    : 'Watching the dice'}
-                <span aria-hidden="true">↗</span>
-              </button>
-            )}
-          </div>
-          {mine && game?.phase === 'move' && (
-            <div className="move-picker" aria-label="Choose a token to move">
-              <span>Your move</span>
-              {moves.map((index) => (
-                <button
-                  key={index}
-                  aria-label={`Move token ${index + 1}`}
-                  disabled={busy || locked || !connected}
-                  onClick={() => play('move', { tokenIndex: index })}
-                >
-                  Token {index + 1} <Icon name="arrow" size={14} />
-                </button>
-              ))}
-            </div>
-          )}
-          {host && game?.status === 'active' && !current?.connected && (
-            <div className="offline-turn">
+        <div className="board-column">
+          <section className="table-panel">
+            <div className="table-toolbar">
               <span>
-                Seat reserved ·{' '}
-                {offlineSeconds < 60
-                  ? `Skip available in ${60 - offlineSeconds}s`
-                  : 'You can skip this turn'}
+                <i className="live-dot" />
+                {finished
+                  ? 'A ROUND TO REMEMBER'
+                  : game
+                    ? 'GAME IN PROGRESS'
+                    : 'THE GATHERING PLACE'}
               </span>
-              <button
-                className="text-button"
-                disabled={offlineSeconds < 60 || busy || locked || !connected}
-                onClick={() => play('skip')}
-              >
-                Skip turn <Icon name="arrow" size={14} />
-              </button>
+              <span className="table-badge">
+                <Icon name="lock" size={12} /> FRIENDS ONLY
+              </span>
             </div>
-          )}
-          <div className="board-legend">
-            <span>
-              <span className="legend-star">✧</span> Star squares are safe
-            </span>
-            <span>
-              <span className="legend-ring" /> Highlighted tokens can move
-            </span>
+            <div className="board-area">
+              <Board
+                players={room.players}
+                game={game}
+                motion={
+                  presentation.moving ? { ...presentation.moving, phase: presentation.phase } : null
+                }
+                selected={busy ? selected : null}
+                legal={moves}
+                onMove={(index) => play('move', { tokenIndex: index })}
+                disabled={busy || locked || !connected}
+              />
+            </div>
+            <div className="turn-controls">
+              <RollingDie
+                value={game?.dice ?? game?.lastRoll ?? 6}
+                rolling={presentation.phase === 'rolling'}
+              />
+              <div className="turn-copy">
+                {game && !finished && (
+                  <span
+                    className="turn-marker"
+                    style={{ '--active-color': `var(--${current?.color})` }}
+                  >
+                    <i />
+                    {mine ? 'Your turn' : `${current?.name}’s turn`}
+                  </span>
+                )}
+                <strong>
+                  {locked
+                    ? presentation.phase === 'rolling'
+                      ? 'Rolling the dice…'
+                      : `Moving token · ${presentation.moving?.step ?? ''}/${presentation.moving?.total ?? ''}`
+                    : finished
+                      ? `${winner?.name} takes the crown!`
+                      : !game
+                        ? 'A good game starts with good company.'
+                        : !current?.connected
+                          ? `${current?.name} is reconnecting…`
+                          : mine
+                            ? game.phase === 'move'
+                              ? 'Your move. Make it count.'
+                              : 'Your turn. Feeling lucky?'
+                            : `${current?.name}’s turn`}
+                </strong>
+                <p aria-live="polite">
+                  {game?.lastAction ?? 'Share your room code and get everyone around the table.'}
+                </p>
+              </div>
+              {game && !finished && (
+                <button
+                  className="primary roll-button"
+                  onClick={() => play('roll')}
+                  disabled={!mine || game.phase !== 'roll' || busy || locked || !connected}
+                >
+                  {busy
+                    ? 'One moment…'
+                    : mine
+                      ? game.phase === 'move'
+                        ? 'Choose a token'
+                        : 'Roll the dice'
+                      : 'Watching the dice'}
+                  <span aria-hidden="true">↗</span>
+                </button>
+              )}
+            </div>
+            {mine && game?.phase === 'move' && (
+              <div className="move-picker" aria-label="Choose a token to move">
+                <span>Your move</span>
+                {moves.map((index) => (
+                  <button
+                    key={index}
+                    aria-label={`Move token ${index + 1}`}
+                    disabled={busy || locked || !connected}
+                    onClick={() => play('move', { tokenIndex: index })}
+                  >
+                    Token {index + 1} <Icon name="arrow" size={14} />
+                  </button>
+                ))}
+              </div>
+            )}
+            {host && game?.status === 'active' && !current?.connected && (
+              <div className="offline-turn">
+                <span>
+                  Seat reserved ·{' '}
+                  {offlineSeconds < 60
+                    ? `Skip available in ${60 - offlineSeconds}s`
+                    : 'You can skip this turn'}
+                </span>
+                <button
+                  className="text-button"
+                  disabled={offlineSeconds < 60 || busy || locked || !connected}
+                  onClick={() => play('skip')}
+                >
+                  Skip turn <Icon name="arrow" size={14} />
+                </button>
+              </div>
+            )}
+            <div className="board-legend">
+              <span>
+                <span className="legend-star">✧</span> Star squares are safe
+              </span>
+              <span>
+                <span className="legend-ring" /> Highlighted tokens can move
+              </span>
+            </div>
+          </section>
+          <div className="after-table">
+            <Soundboard social={social} connected={connected} />
+            <BadlaBoard room={room} />
           </div>
-        </section>
+        </div>
         <aside className="room-sidebar">
           <section className="panel seats-panel">
             <div className="panel-heading">

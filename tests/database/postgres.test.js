@@ -41,6 +41,19 @@ test(
     await emit(a, 'game:roll', { version: 0, matchNumber: 1 });
     await emit(a, 'game:move', { version: 1, matchNumber: 1, tokenIndex: 0 });
     await emit(b, 'chat:send', { text: 'This message survives restart.' });
+    const captureSeed = await runtime.service.repository.get(alice.room.code);
+    captureSeed.game.players[0].tokens[0] = 8;
+    captureSeed.game.players[1].tokens[0] = 1;
+    await runtime.service.repository.save(captureSeed);
+    await emit(a, 'game:roll', { version: 2, matchNumber: 1 });
+    await emit(a, 'game:move', { version: 3, matchNumber: 1, tokenIndex: 0 });
+    const sentReaction = await emit(a, 'social:react', {
+      kind: 'sound',
+      key: 'wah',
+      requestId: 'persist-reaction-001',
+      matchNumber: 1,
+    });
+    assert.equal(sentReaction.ok, true);
     clients.forEach((c) => c.disconnect());
     await runtime.close();
     runtime = null;
@@ -48,8 +61,17 @@ test(
     const rejoined = await connect();
     const restored = await emit(rejoined, 'room:resume', alice.session);
     assert.equal(restored.ok, true);
-    assert.equal(restored.room.game.players[0].tokens[0], 0);
-    assert.equal(restored.room.game.version, 2);
+    assert.equal(restored.room.game.players[0].tokens[0], 14);
+    assert.equal(restored.room.social.captures[alice.session.playerId][bob.session.playerId], 1);
+    assert.equal(restored.room.game.version, 4);
+    const limited = await emit(rejoined, 'social:react', {
+      kind: 'sound',
+      key: 'dhoka',
+      requestId: 'persist-reaction-002',
+      matchNumber: 1,
+    });
+    assert.equal(limited.ok, false);
+    assert.ok(limited.retryAfterMs > 0);
     assert.equal(restored.room.chat[0].text, 'This message survives restart.');
     assert.equal(restored.room.players[0].tokenHash, undefined);
     const another = await connect();
@@ -63,6 +85,6 @@ test(
       (await fetch('http://127.0.0.1:' + runtime.server.address().port + '/api/health')).status,
       503,
     );
-    assert.equal((await emit(rejoined, 'game:roll', { version: 2, matchNumber: 1 })).ok, false);
+    assert.equal((await emit(rejoined, 'game:roll', { version: 4, matchNumber: 1 })).ok, false);
   },
 );

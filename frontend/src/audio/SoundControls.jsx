@@ -23,6 +23,15 @@ export function SoundControls() {
             {settings.muted ? 'Unmute' : 'Mute'}
           </button>
         </div>
+        <label className="banter-toggle">
+          <span>Automatic banter</span>
+          <input
+            type="checkbox"
+            aria-label="Automatic banter"
+            checked={settings.autoBanter}
+            onChange={(event) => soundManager.setAutoBanter(event.target.checked)}
+          />
+        </label>
         <label htmlFor="game-volume">
           Volume <output>{Math.round(settings.volume * 100)}%</output>
         </label>

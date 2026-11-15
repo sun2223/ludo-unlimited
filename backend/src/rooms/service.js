@@ -1,5 +1,6 @@
 import { randomBytes, randomUUID, createHash, timingSafeEqual, randomInt } from 'node:crypto';
 import { COLORS, newGame, rollDice, moveToken, skipTurn } from '@ludo/shared';
+import { BanterEngine } from '../banter/BanterEngine.js';
 const hash = (value) => createHash('sha256').update(value).digest('hex');
 export function nickname(value) {
   if (typeof value !== 'string') throw new Error('Enter a nickname.');
@@ -14,8 +15,12 @@ export function roomCode(value) {
   return value.toUpperCase().trim();
 }
 export class RoomService {
-  constructor(repository, { die = () => randomInt(1, 7), now = Date.now } = {}) {
+  constructor(
+    repository,
+    { die = () => randomInt(1, 7), now = Date.now, banter = new BanterEngine() } = {},
+  ) {
     this.repository = repository;
+    this.banter = banter;
     this.queues = new Map();
     this.presence = new Map();
     this.offline = new Map();
@@ -119,6 +124,13 @@ export class RoomService {
   publicRoom(room) {
     return {
       ...room,
+      social: room.social
+        ? {
+            matchNumber: room.social.matchNumber,
+            captures: room.social.captures ?? {},
+            revengeCounts: room.social.revengeCounts ?? {},
+          }
+        : undefined,
       serverTime: this.now(),
       hostId: this.host(room),
       players: room.players.map(({ tokenHash, ...p }) => ({
@@ -150,6 +162,7 @@ export class RoomService {
         throw new Error('You need 2–4 connected players to start.');
       room.game = newGame(room.players, room.matchNumber % room.players.length);
       room.matchNumber++;
+      this.banter.onStart(room);
     });
   }
   async play(session, data, action) {
@@ -206,6 +219,12 @@ export class RoomService {
             }
           : {}),
       };
+      try {
+        this.banter.onAction(room, before);
+      } catch (error) {
+        if (room.social) room.social.autoEvents = [];
+        console.error('Optional banter unavailable:', error.message);
+      }
     });
   }
   async leave(session) {

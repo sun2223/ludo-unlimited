@@ -18,7 +18,13 @@ export class ChatService {
       throw new Error('Give your friends a moment to reply.');
     this.lastSent.set(key, Date.now());
     return this.rooms.mutate(session, (room) => {
-      room.chat.push({ id: randomUUID(), playerId: key, text: text.trim(), at: Date.now() });
+      room.chat.push({
+        type: 'text',
+        id: randomUUID(),
+        playerId: key,
+        text: text.trim(),
+        at: Date.now(),
+      });
       room.chat = room.chat.slice(-100);
     });
   }

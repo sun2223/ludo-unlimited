@@ -5,7 +5,8 @@ export function request(event, payload) {
     if (!socket.connected) return reject(new Error('You are offline. Reconnecting…'));
     socket.timeout(8000).emit(event, payload, (error, result) => {
       if (error) reject(new Error('The server did not respond. Reconnect before retrying.'));
-      else if (!result.ok) reject(new Error(result.error));
+      else if (!result.ok)
+        reject(Object.assign(new Error(result.error), { retryAfterMs: result.retryAfterMs }));
       else resolve(result);
     });
   });

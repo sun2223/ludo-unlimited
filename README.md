@@ -111,6 +111,30 @@ There is no match count, energy, payment, or daily rematch restriction. Connecti
 
 Use the real HTTPS URL in two independent browser sessions on different networks (for example desktop Wi-Fi and a friend's phone on mobile data). Create/join by code, chat in both directions, start, roll and move, verify the same positions, switch a phone offline/online, reload and rejoin, finish a game, and rematch. Repeat with four players. Check proxy/WebSocket logs if a session cannot connect. Record the result before claiming internet play is verified.
 
+## Hinglish banter and social reactions
+
+The server's separate `BanterEngine` selects from **128 original dialogues (16 for each of eight categories)**. Categories cover waiting for an unlocking six, sixes, captures, losses, revenge, approaching victory, winning, and slow turns. Clients never choose automatic text or submit capture claims. Recent line indices and cooldowns prevent frequent repetition. An exact same dialogue/event is broadcast to the whole room.
+
+Accepted game actions atomically save their optional social metadata with the existing JSON snapshot. Banter has no awaited media work or artificial turn delay; an optional banter failure cannot reject an otherwise valid game action. A separate slow-turn scan only reminds connected players and never skips a turn. Win and revenge notices bypass the general auto cooldown.
+
+Default limits in `shared/social.js` are configurable: 2.5 seconds between ordinary auto batches, 12 seconds per ordinary category, 45 seconds before a slow-turn reminder, 2.5 seconds per player's manual reaction, 600 ms per room's manual reaction, and four manual reactions per player per 15 seconds. Manual rate receipts are persisted so reconnects/restarts cannot reset the limits. Socket-level social traffic uses a separate request allowance from game/chat actions.
+
+The six soundboard buttons use original, short synthesized musical stingers, **not spoken movie clips**. Reactions and emoji share the manual limit. The server accepts only the allowlisted keys, assigns event IDs and expiry/dispatch timestamps, and scopes broadcasts to the authenticated seat's room. Event IDs deduplicate both notifications and audio, including the sender's broadcast/ack pair. Expired events, previous matches and restored snapshots are not replayed. Emoji use a pointer-transparent overlay and respect reduced motion.
+
+The Badla Board shows captures made, tokens lost and revenge captures, plus the per-player capture pairs. A capture creates a debt; a counter-capture consumes one debt and emits a revenge notice. Counts survive PostgreSQL restarts and reset on rematch. Existing matches remain playable after upgrade; captures from before the feature was installed cannot be reconstructed.
+
+The header's Sound settings retain mute/volume and add an independently saved **Automatic banter** toggle. Disabling it hides/silences auto banter while leaving friends' manual reactions available. Global mute silences all sound effects.
+
+Voice notes remain disabled. Typed chat preserves legacy text messages and has a separate renderer plus future media policy. See [voice-note architecture](docs/VOICE_NOTES.md). There are no recording/upload routes or microphone permission requests.
+
+### Render update and verification
+
+The existing Render URL is https://ludo-unlimited.onrender.com/. This feature requires no new packages, database migration, environment variables, build/start commands or hosting configuration. Social data extends the existing PostgreSQL JSON snapshot. Existing single-process deployment constraints still apply.
+
+Run `npm test`, `npm run test:db`, and `npm run test:browser` before deployment. Focused social browser tests are `npm run test:browser -- --grep social:`. Their shortened cooldowns and replay/seed controls exist only in the loopback test fixture.
+
+After deploying, run `node scripts/browser-tests.js --config playwright.live.config.js` for the live Render smoke test. It creates its own private test room with two isolated guest sessions, checks matching soundboard events/audio, two-way chat, a real random roll/move, and refresh/rejoin. It does not alter other rooms. Override `LUDO_LIVE_URL` only to test another explicitly selected deployment. It does not test a complete ordinary-random match on production or geographically separate physical devices.
+
 ## Animation, sound and visual presentation
 
 The rules and Socket.IO event names are unchanged. Each accepted roll/move/skip now includes a small `lastEvent` record in the committed room snapshot: match/version identity, server timestamp, acting player, and for moves the validated start/end progress and captured tokens. Public snapshots also carry `serverTime`. Older snapshots without this optional metadata still render correctly.

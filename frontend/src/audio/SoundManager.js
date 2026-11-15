@@ -1,5 +1,35 @@
 // Original synthesized chimes: no downloaded recordings or third-party sound assets.
 export const SOUNDS = Object.freeze({
+  reaction_dhoka: [
+    [196, 0, 0.1],
+    [196, 0.14, 0.15],
+  ],
+  reaction_ruk_ja: [
+    [440, 0, 0.08],
+    [370, 0.09, 0.08],
+    [294, 0.18, 0.16],
+  ],
+  reaction_aayega: [
+    [330, 0, 0.08],
+    [392, 0.11, 0.08],
+    [440, 0.22, 0.14],
+  ],
+  reaction_wah: [
+    [587, 0, 0.08],
+    [784, 0.1, 0.09],
+    [988, 0.2, 0.14],
+  ],
+  reaction_sher: [
+    [220, 0, 0.08],
+    [330, 0.08, 0.08],
+    [494, 0.16, 0.08],
+    [660, 0.24, 0.16],
+  ],
+  reaction_game_over: [
+    [392, 0, 0.1],
+    [294, 0.12, 0.1],
+    [196, 0.24, 0.2],
+  ],
   dice: [
     [240, 0, 0.045],
     [330, 0.06, 0.045],
@@ -41,11 +71,18 @@ export class SoundManager {
         const Context = globalThis.AudioContext ?? globalThis.webkitAudioContext;
         return Context ? new Context() : null;
       });
-    this.settings = { muted: false, volume: 0.35, ready: false, unavailable: false };
+    this.settings = {
+      autoBanter: true,
+      muted: false,
+      volume: 0.35,
+      ready: false,
+      unavailable: false,
+    };
     try {
       const stored = JSON.parse(this.getStorage()?.getItem('ludo-unlimited-audio') ?? 'null');
       if (stored) {
         this.settings.muted = stored.muted === true;
+        this.settings.autoBanter = stored.autoBanter !== false;
         this.settings.volume = Number.isFinite(stored.volume)
           ? Math.min(1, Math.max(0, stored.volume))
           : 0.35;
@@ -53,6 +90,7 @@ export class SoundManager {
     } catch {
       /* Audio preferences are optional. */
     }
+    this.eventIDs = new Set();
     this.listeners = new Set();
     this.voices = new Set();
   }
@@ -69,7 +107,11 @@ export class SoundManager {
     try {
       this.getStorage()?.setItem(
         'ludo-unlimited-audio',
-        JSON.stringify({ muted: this.settings.muted, volume: this.settings.volume }),
+        JSON.stringify({
+          muted: this.settings.muted,
+          volume: this.settings.volume,
+          autoBanter: this.settings.autoBanter,
+        }),
       );
     } catch {}
     if (this.master)
@@ -79,6 +121,15 @@ export class SoundManager {
         0.015,
       );
     this.listeners.forEach((fn) => fn());
+  }
+  setAutoBanter(enabled) {
+    this.update({ autoBanter: Boolean(enabled) });
+  }
+  playEvent(name, id) {
+    if (typeof id !== 'string' || this.eventIDs.has(id)) return false;
+    this.eventIDs.add(id);
+    if (this.eventIDs.size > 1024) this.eventIDs.delete(this.eventIDs.values().next().value);
+    return this.play(name);
   }
   setMuted(muted) {
     this.update({ muted: Boolean(muted) });

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { request } from '../network/client.js';
+import { ChatMessage } from './ChatMessage.jsx';
 import { Icon } from '../components/Icons.jsx';
 export function Chat({ room, me, connected, onError }) {
   const [text, setText] = useState(''),
@@ -13,7 +14,7 @@ export function Chat({ room, me, connected, onError }) {
     if (!text.trim() || sending) return;
     setSending(true);
     try {
-      await request('chat:send', { text });
+      await request('chat:send', { type: 'text', text });
       setText('');
     } catch (error) {
       onError(error.message);
@@ -35,29 +36,14 @@ export function Chat({ room, me, connected, onError }) {
           <strong>The banter starts here.</strong>
           <p>Say hello, celebrate a six, or negotiate a very temporary alliance.</p>
         </div>
-        {room.chat.map((message) => {
-          const player = room.players.find((p) => p.id === message.playerId);
-          return (
-            <div
-              className={`chat-message ${message.playerId === me ? 'mine' : ''}`}
-              key={message.id}
-            >
-              <div>
-                <b className={player?.color}>
-                  {player?.name ?? 'Former player'}
-                  {message.playerId === me ? ' (you)' : ''}
-                </b>
-                <time dateTime={new Date(message.at).toISOString()}>
-                  {new Date(message.at).toLocaleTimeString([], {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                </time>
-              </div>
-              <p>{message.text}</p>
-            </div>
-          );
-        })}
+        {room.chat.map((message) => (
+          <ChatMessage
+            key={message.id}
+            message={message}
+            player={room.players.find((p) => p.id === message.playerId)}
+            me={me}
+          />
+        ))}
       </div>
       <form className="chat-form" onSubmit={send}>
         <input
