@@ -88,3 +88,79 @@ test(
     assert.equal((await emit(rejoined, 'game:roll', { version: 4, matchNumber: 1 })).ok, false);
   },
 );
+
+test(
+  'Render standby serves readiness but gates sockets and writes until the old writer releases',
+  { timeout: 15000 },
+  async (t) => {
+    const url = process.env.TEST_DATABASE_URL;
+    const owner = new PostgresRepository(url);
+    await owner.ready();
+    let oldApp = createApplication({ repository: owner }),
+      newApp;
+    const clients = [];
+    t.after(async () => {
+      clients.forEach((s) => s.disconnect());
+      if (oldApp) await oldApp.close();
+      if (newApp) await newApp.close();
+    });
+    await new Promise((resolve) => oldApp.server.listen(0, '127.0.0.1', resolve));
+    const oldClient = io('http://127.0.0.1:' + oldApp.server.address().port, { forceNew: true });
+    clients.push(oldClient);
+    await new Promise((resolve) => oldClient.once('connect', resolve));
+    const created = await emit(oldClient, 'room:create', { name: 'Handoff Alice' });
+    assert.equal(created.ok, true);
+    const replacement = new PostgresRepository(url);
+    await replacement.ready({ allowStandby: true, handoffTimeoutMs: 8000, retryMs: 20 });
+    assert.equal(replacement.standby, true);
+    assert.equal(replacement.healthy, false);
+    await assert.rejects(() => replacement.get(created.room.code), /unavailable/);
+    newApp = createApplication({ repository: replacement });
+    await new Promise((resolve) => newApp.server.listen(0, '127.0.0.1', resolve));
+    const origin = 'http://127.0.0.1:' + newApp.server.address().port;
+    const health = await fetch(origin + '/api/health');
+    assert.equal(health.status, 200);
+    assert.deepEqual(await health.json(), { ok: true, starting: true });
+    const nextClient = io(origin, { forceNew: true });
+    clients.push(nextClient);
+    const connected = new Promise((resolve) => nextClient.once('connect', resolve));
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    assert.equal(nextClient.connected, false);
+    assert.equal(owner.healthy, true);
+    await oldApp.close();
+    oldApp = null;
+    await replacement.whenActive();
+    await connected;
+    assert.equal(replacement.healthy, true);
+    assert.equal(replacement.standby, false);
+    const restored = await emit(nextClient, 'room:resume', created.session);
+    assert.equal(restored.ok, true);
+    assert.equal(restored.session.playerId, created.session.playerId);
+    const contender = new PostgresRepository(url);
+    await assert.rejects(() => contender.ready(), /Another Ludo server/);
+    await contender.close();
+    assert.deepEqual(await (await fetch(origin + '/api/health')).json(), { ok: true });
+  },
+);
+
+test(
+  'Render handoff timeout fails closed and never steals an active writer lock',
+  { timeout: 10000 },
+  async () => {
+    const url = process.env.TEST_DATABASE_URL,
+      owner = new PostgresRepository(url),
+      waiting = new PostgresRepository(url);
+    try {
+      await owner.ready();
+      await waiting.ready({ allowStandby: true, handoffTimeoutMs: 80, retryMs: 10 });
+      await assert.rejects(waiting.whenActive(), /Timed out/);
+      assert.equal(waiting.healthy, false);
+      assert.equal(waiting.standby, false);
+      assert.equal(owner.healthy, true);
+      await assert.rejects(() => waiting.get('ABC234'), /unavailable/);
+    } finally {
+      await waiting.close();
+      await owner.close();
+    }
+  },
+);

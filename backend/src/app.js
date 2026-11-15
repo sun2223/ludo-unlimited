@@ -24,13 +24,17 @@ export function createApplication({
     helmet({ contentSecurityPolicy: { directives: { 'connect-src': ["'self'", 'ws:', 'wss:'] } } }),
   );
   app.get('/api/health', (_req, res) => {
-    const ok = repository.healthy !== false;
-    res.status(ok ? 200 : 503).json({ ok });
+    // Render may route to the replacement before signalling the old writer to stop.
+    // The web process is ready in standby, but namespace connections wait for the lease.
+    const ok = repository.healthy !== false || repository.standby === true;
+    res.status(ok ? 200 : 503).json({ ok, ...(repository.standby ? { starting: true } : {}) });
   });
   app.use(express.static(fileURLToPath(new URL('../../frontend/dist', import.meta.url))));
   const server = createServer(app);
   const origins = origin.split(',').map((o) => o.trim());
   const io = new Server(server, {
+    // Render waits 60s after rerouting before signalling the previous instance.
+    connectTimeout: repository.standby ? 180000 : 45000,
     maxHttpBufferSize: 16384,
     cors: { origin: origins },
     allowRequest: (req, done) =>
@@ -43,6 +47,14 @@ export function createApplication({
   const monitor = new SlowTurnMonitor(io, service);
   const chat = new ChatService(service);
   const social = new SocialService(service);
+  io.use(async (socket, next) => {
+    try {
+      await repository.whenActive?.();
+      if (socket.conn.readyState === 'open') next();
+    } catch {
+      next(new Error('The server is restarting. Please reconnect shortly.'));
+    }
+  });
   io.on('connection', (socket) => {
     const buckets = new Map();
     const handle = (event, fn) =>
